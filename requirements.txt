@@ -1,3 +1,6 @@
 Flask
-gunicorn
 Flask-CORS
+gunicorn
+transformers
+torch
+numpy
