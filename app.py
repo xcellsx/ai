@@ -102,4 +102,4 @@ if __name__ == '__main__':
     print("--- Starting Flask Development Server ---")
     # Make sure host is '0.0.0.0' to be accessible from other devices/containers if needed
     # Port 5000 is the default
-    app.run(host='0.0.0.0', port=5000, debug=False) # Set debug=False for production
+    app.run(host='0.0.0.0', port=10000, debug=False) # Set debug=False for production
