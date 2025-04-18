@@ -1,70 +1,118 @@
-# Getting Started with Create React App
+# Emotional Journal - React Application
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Description
 
-## Available Scripts
+Emotional Journal is a web application designed to help users explore and understand their emotions through daily journaling. Users can write entries, receive an AI-powered analysis of the inferred emotion, visualize their emotional trends over time on a calendar, and view aggregated reports. The goal is to promote self-reflection and emotional awareness.
 
-In the project directory, you can run:
+This application uses client-side Local Storage for data persistence, meaning all journal entries are stored directly in your browser.
 
-### `npm start`
+## Features
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+* **Journal Entry:** Create new journal entries using a simple text editor.
+* **Emotion Analysis:** Submit entries to a backend AI model (via Flask API) to get an inferred emotion classification (e.g., sadness, joy, anger).
+* **History Calendar:** View a monthly calendar where days are color-coded based on the most frequent emotion logged for that day.
+* **Month Navigation:** Navigate between previous and next months in the history view.
+* **Daily Entry Modal:** Click on a date in the calendar to view all entries logged for that specific day, along with emotion counts.
+* **Reports:** View summary visualizations:
+    * A heatmap showing the relationship between total emotion counts and inferred depression levels.
+    * A bar chart displaying the total count for each detected emotion.
+* **Data Persistence:** Entries and analysis results are saved locally in the browser's Local Storage.
+* **UI:** Minimalist design with a fixed header, consistent navigation, and an animated pastel gradient background.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Technology Stack
 
-### `npm test`
+* **Frontend:**
+    * React (~v19.1.0 - see installation notes)
+    * React Router (`react-router-dom`) for page navigation.
+    * Styled Components (`styled-components`) for component styling and theming (including buttons, animated background).
+    * ApexCharts (`react-apexcharts`, `apexcharts`) for heatmap and bar chart visualizations.
+* **Backend:**
+    * Python Flask for the API server.
+    * Flask-CORS for handling cross-origin requests from the React frontend.
+    * Hugging Face `transformers` library for loading and using the sentiment analysis model.
+    * PyTorch (`torch`) as the backend for the transformers model.
+    * NumPy (often a dependency for ML tasks).
+* **Storage:**
+    * Browser Local Storage (Client-Side).
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Setup and Installation
 
-### `npm run build`
+### Prerequisites
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+* Node.js and npm (or yarn) installed.
+* Python (3.7+ recommended) and pip installed.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Backend Setup (Flask API)
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+1.  **Navigate:** Open your terminal and navigate to the directory containing `app.py` (e.g., `cd path/to/ai\ project/backend`).
+2.  **Create Virtual Environment:** It's highly recommended to use a virtual environment.
+    ```bash
+    python -m venv venv
+    ```
+3.  **Activate Virtual Environment:**
+    * macOS/Linux: `source venv/bin/activate`
+    * Windows (cmd): `venv\Scripts\activate`
+    * Windows (PowerShell): `venv\Scripts\Activate.ps1`
+4.  **Install Python Dependencies:**
+    ```bash
+    pip install Flask Flask-Cors transformers torch numpy
+    ```
+    * **Note on PyTorch (`torch`):** For optimal performance (especially with a GPU), you might need a specific version of PyTorch corresponding to your CUDA version. Visit the [official PyTorch website](https://pytorch.org/get-started/locally/) for the recommended installation command for your system. The command above installs the standard CPU/GPU version.
+5.  **Download/Place Model:** Ensure you have the pre-trained Hugging Face model saved. The code expects it at `./results/bert_uncased_L-2_H-128_A-2-finetuned-emotion/best_model` relative to `app.py`. **Verify the `MODEL_PATH` variable inside `app.py` points to the correct location.**
+6.  **(Optional) Create `requirements.txt`:** You can run `pip freeze > requirements.txt` to save the dependencies for easier installation later (`pip install -r requirements.txt`).
 
-### `npm run eject`
+### Frontend Setup (React App)
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+1.  **Navigate:** Open another terminal window/tab and navigate to your React project directory:
+    ```bash
+    cd path/to/ai\ project/my-react-app
+    ```
+2.  **Install Node Dependencies:** This command installs React, React Router, Styled Components, ApexCharts, and all other necessary packages listed in your `package.json`.
+    ```bash
+    npm install
+    ```
+    * *Alternatively, if you use Yarn:*
+        ```bash
+        yarn install
+        ```
+3.  **Dependency Overview:** Key libraries installed by the command above (or added previously) include:
+    * `react`, `react-dom`
+    * `react-router-dom`
+    * `styled-components`
+    * `react-apexcharts`
+    * `apexcharts`
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+4.  **React 19 Warning:** You are using React `~19.1.0`. Some libraries, like `react-apexcharts`, might not have explicitly listed compatibility with React 19 yet and could show **peer dependency warnings** during installation. If you encounter runtime errors:
+    * Check the library's documentation/GitHub for React 19 support updates.
+    * Consider downgrading React to the latest v18 (`npm install react@^18.2.0 react-dom@^18.2.0`).
+    * As a last resort, you *might* bypass the warning with `npm install --legacy-peer-deps`, but this is risky and not recommended for stability.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Running the Application
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+You need to run both the Backend and Frontend servers simultaneously.
 
-## Learn More
+1.  **Run Backend Server:**
+    * Navigate to the backend directory (`cd path/to/ai\ project/backend`).
+    * Activate the virtual environment (e.g., `source venv/bin/activate`).
+    * Run the Flask app: `python app.py`
+    * Keep this terminal running. It will likely serve on `http://localhost:5000`.
+2.  **Run Frontend Server:**
+    * Navigate to the frontend directory (`cd path/to/ai\ project/my-react-app`).
+    * Run the React development server: `npm start` (or `yarn start`).
+    * This should automatically open the application in your browser, usually at `http://localhost:3000`.
+    * Keep this terminal running.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Now you can access the Emotional Journal app in your browser!
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Usage
 
-### Code Splitting
+1.  The application opens on the **Home** page.
+2.  Use the navigation buttons (`Home`, `Journal Entry`, `View History`, `View Report`) in the header or on the pages to move between sections.
+3.  Go to **Journal Entry** to write your thoughts and click "Submit Entry". The app will send the text to the backend for analysis and display the result. Entries are saved automatically to your browser's Local Storage.
+4.  Go to **View History** to see a calendar view. Days with entries are colored based on the most frequent emotion logged that day. Use the arrows to navigate months. Click on a specific date to open a modal showing all entries and emotion counts for that day.
+5.  Go to **View Report** to see visualizations based on *all* your saved entries, including a heatmap correlating emotions with inferred depression levels and a bar chart showing total emotion counts.
+6.  Data is stored **only in your current browser**. Clearing browser data will remove your journal history.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Disclaimer
 
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+**This application is for informational and self-reflection purposes only. It is not a diagnostic tool and cannot replace professional medical or psychological advice, diagnosis, or treatment. If you are experiencing significant emotional distress, please consult with a qualified healthcare professional.**
