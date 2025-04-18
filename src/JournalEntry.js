@@ -1,6 +1,6 @@
 // src/JournalEntry.js
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import AnimatedBackgroundContainer from './AnimatedBackgroundContainer';
 // Assuming StyledNavButton is defined here or imported from './StyledComponents'
