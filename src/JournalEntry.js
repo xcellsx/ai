@@ -65,7 +65,7 @@ function JournalEntry() {
         setResponse('Analyzing your thoughts...');
 
         try {
-            const backendUrl = 'http://localhost:5000/analyze'; // Ensure URL is correct
+            const backendUrl = 'https://ai-xa9k.onrender.com'; // Ensure URL is correct
             const apiResponse = await fetch(backendUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', },
