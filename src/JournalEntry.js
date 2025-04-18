@@ -45,7 +45,6 @@ function JournalEntry() {
     const [userInput, setUserInput] = useState('');
     const [response, setResponse] = useState('');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const navigate = useNavigate(); // Keep if needed for other navigation
 
     // --- Core Logic ---
     const handleInputChange = (e) => {
