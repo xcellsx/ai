@@ -66,7 +66,8 @@ function JournalEntry() {
 
         try {
             const backendUrl = 'https://ai-xa9k.onrender.com'; // Ensure URL is correct
-            const apiResponse = await fetch(backendUrl, {
+            const endpoint = `${backendBaseUrl}/analyze`;
+            const apiResponse = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', },
                 body: JSON.stringify({ text: userInput }),
