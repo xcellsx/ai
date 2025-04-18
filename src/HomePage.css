@@ -1,0 +1,24 @@
+/* HomePage.css */
+
+.home-button {
+    /* Base styles */
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 20px;
+    border: 2px solid black;
+    margin: 10px;
+    cursor: pointer;
+    display: inline-block; /* Ensures buttons flow correctly */
+    background-color: transparent; /* Start transparent */
+    color: black;               /* Start with black text */
+  
+    /* Smooth transition for hover effect */
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  .home-button:hover {
+    /* Hover styles */
+    background-color: black; /* Black background on hover */
+    color: white;           /* White text on hover */
+  }
