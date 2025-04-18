@@ -1,0 +1,20 @@
+# Netlify configuration file for your create-react-app project
+
+[build]
+  # Command to build your site (uses the "build" script from your package.json)
+  command = "npm run build" 
+  
+  # The directory Netlify will deploy (create-react-app outputs to "build")
+  publish = "build"    
+
+[build.environment]
+  # Optional: Specify Node.js version if needed, otherwise Netlify uses a default.
+  # Check Netlify docs for current defaults/supported versions. Example:
+  # NODE_VERSION = "18" 
+
+# VERY IMPORTANT: Rewrite rule for Single Page Applications (like React Router)
+# This ensures direct links or page refreshes work correctly.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
