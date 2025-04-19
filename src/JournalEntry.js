@@ -3,13 +3,14 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import AnimatedBackgroundContainer from './AnimatedBackgroundContainer';
+
 // Assuming StyledNavButton is defined here or imported from './StyledComponents'
 const StyledNavButton = styled.button`
   background-color: transparent;
   color: #333;
   border: 1px solid black;
   padding: 10px 25px; // Padding for submit button
-  margin: 0 5px;     // Margin for nav buttons primarily
+  margin: 0 5px;      // Margin for nav buttons primarily
   border-radius: 5px;
   cursor: pointer;
   font-size: 1em;    // Font size for submit button
@@ -55,8 +56,9 @@ function JournalEntry() {
         // Prevent submission if already analyzing or input is empty
         if (isAnalyzing || userInput.trim() === '') {
              if (userInput.trim() === '') {
-                setResponse('Please write something before submitting.');
-                setTimeout(() => { setResponse(''); }, 3000);
+                 setResponse('Please write something before submitting.');
+                 // Clear the message after 3 seconds
+                 setTimeout(() => { setResponse(prev => prev === 'Please write something before submitting.' ? '' : prev); }, 3000);
              }
             return;
         }
@@ -65,7 +67,8 @@ function JournalEntry() {
         setResponse('Analyzing your thoughts...');
 
         try {
-            const backendUrl = 'https://ai-xa9k.onrender.com'; // Ensure URL is correct
+            // *** IMPORTANT: Update this URL if your Render backend URL changed ***
+            const backendUrl = 'https://ai-f53i.onrender.com'; // Use the URL for the backend with BOTH models
             const endpoint = `${backendUrl}/analyze`;
             const apiResponse = await fetch(endpoint, {
                 method: 'POST',
@@ -73,87 +76,76 @@ function JournalEntry() {
                 body: JSON.stringify({ text: userInput }),
             });
 
+            // // localhost version for testing
+            // const backendUrl = 'http://localhost:5000'; // Use the URL for the backend with BOTH models
+            // const endpoint = `${backendUrl}/analyze`;
+            // const apiResponse = await fetch(endpoint, {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json', },
+            //     body: JSON.stringify({ text: userInput }),
+            // });
+
             if (!apiResponse.ok) {
                 let errorDetails = `Server responded with status: ${apiResponse.status}`;
-                try { const errorData = await apiResponse.json(); errorDetails += `. ${errorData.error || JSON.stringify(errorData)}`; } catch (e) { errorDetails += ". Could not parse error response."; }
+                try {
+                    const errorData = await apiResponse.json();
+                    // Use the specific error message from backend if available
+                    errorDetails += `. ${errorData.error || JSON.stringify(errorData)}`;
+                } catch (e) {
+                    errorDetails += ". Could not parse error response body.";
+                }
                 console.error("Backend error:", errorDetails);
-                throw new Error(errorDetails); // Throw error to be caught below
+                // Display the error message to the user
+                throw new Error(errorDetails);
             }
 
+            // Expecting response like: {'emotion': '...', 'depression': '...'}
             const result = await apiResponse.json();
             console.log("Analysis result from backend:", result);
 
-            let finalEmotion = null;
-            let formattedResponse = "";
+            // Extract results, providing defaults if keys are missing or null
+            const detectedEmotion = result.emotion || 'N/A';
+            const detectedDepression = result.depression || 'N/A'; // Get the depression result
 
-            if (result && result.emotion) {
-                finalEmotion = result.emotion; // Get the raw emotion label
-                formattedResponse = `Detected Emotion: ${finalEmotion} | Depression: NA. Thank you for sharing.`;
-                setResponse(formattedResponse);
+            // Format the response string to show both results
+            const formattedResponse = `Emotion: ${detectedEmotion} | Depression: ${detectedDepression}. Thank you for sharing.`;
+            setResponse(formattedResponse); // Update the UI
 
-                // --- SAVE TO LOCAL STORAGE (Handles Multiple Entries) ---
-                try {
-                    const todayDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-                    const allEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+            // --- SAVE TO LOCAL STORAGE (Handles Multiple Entries) ---
+            try {
+                const todayDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+                const allEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+                const dayEntries = allEntries[todayDate] || []; // Get existing array or init empty
 
-                    // Get existing array for the day OR initialize empty array
-                    const dayEntries = allEntries[todayDate] || [];
+                const newEntryData = {
+                    // Store the actual detected values
+                    emotion: detectedEmotion,
+                    depression: detectedDepression, // Store the actual depression result
+                    text: userInput,
+                    // Store the formatted string that was shown to the user
+                    botResponse: formattedResponse,
+                    timestamp: new Date().toISOString() // Add timestamp for ordering
+                };
 
-                    const newEntryData = {
-                        emotion: finalEmotion,
-                        depression: 'NA', // Placeholder - update when backend provides it
-                        text: userInput,
-                        botResponse: formattedResponse,
-                        timestamp: new Date().toISOString() // Add timestamp for ordering
-                    };
+                dayEntries.push(newEntryData); // Append the new entry
+                allEntries[todayDate] = dayEntries; // Update the main entries object
 
-                    // Append the new entry to the array for that day
-                    dayEntries.push(newEntryData);
+                localStorage.setItem('journalEntries', JSON.stringify(allEntries));
+                console.log(`Entry saved for ${todayDate}. Total entries for day: ${dayEntries.length}`, newEntryData);
 
-                    // Update the main entries object with the modified array
-                    allEntries[todayDate] = dayEntries;
-
-                    localStorage.setItem('journalEntries', JSON.stringify(allEntries));
-                    console.log(`Entry saved for ${todayDate}. Total entries for day: ${dayEntries.length}`, newEntryData);
-
-                } catch (storageError) {
-                    console.error("Failed to save entry to Local Storage:", storageError);
-                    // Optionally inform the user that saving failed but analysis worked
-                    setResponse(prev => prev + " (Couldn't save entry)");
-                }
-                // --- END SAVE TO LOCAL STORAGE ---
-
-            } else {
-                // Handle case where emotion couldn't be determined
-                formattedResponse = "Could not determine emotion | Depression: NA. Thank you for sharing.";
-                setResponse(formattedResponse);
-
-                // Optionally save this case too, pushing to the array
-                 try {
-                    const todayDate = new Date().toISOString().split('T')[0];
-                    const allEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
-                    const dayEntries = allEntries[todayDate] || []; // Get or init array
-                    const newEntryData = {
-                        emotion: null, // Indicate unknown emotion
-                        depression: 'NA',
-                        text: userInput,
-                        botResponse: formattedResponse,
-                        timestamp: new Date().toISOString()
-                    };
-                    dayEntries.push(newEntryData); // Append
-                    allEntries[todayDate] = dayEntries; // Update
-                    localStorage.setItem('journalEntries', JSON.stringify(allEntries));
-                    console.log(`Entry saved (unknown emotion) for ${todayDate}. Total entries for day: ${dayEntries.length}`, newEntryData);
-                 } catch (storageError) {
-                     console.error("Failed to save entry (unknown emotion) to Local Storage:", storageError);
-                     setResponse(prev => prev + " (Couldn't save entry)");
-                 }
+            } catch (storageError) {
+                console.error("Failed to save entry to Local Storage:", storageError);
+                // Inform user saving failed, but keep the analysis result visible
+                setResponse(prev => `${prev} (Error saving entry)`);
             }
+            // --- END SAVE TO LOCAL STORAGE ---
 
-            setUserInput(''); // Clear input only after successful processing
+            // Clear input only after successful analysis and attempted save
+            setUserInput('');
 
         } catch (error) {
              console.error("Error during submission or analysis:", error);
+             // Display the specific error message from the backend or fetch process
              setResponse(`An error occurred: ${error.message}. Please try again.`);
              // Keep user input in the textarea in case of error for retry
         } finally {
@@ -164,10 +156,10 @@ function JournalEntry() {
     // --- End Core Logic ---
 
     // --- Styles ---
-    // Using inline styles for brevity, consider moving to styled-components or CSS Modules
-    const fixedHeaderStyle = { position: 'fixed', top: 0, left: 0, width: '100%', backdropFilter: 'blur(8px)', padding: '15px 0', textAlign: 'center', zIndex: 10, fontSize: '20px', fontWeight: 'bold', color: '#333', };
+    // (Styles remain the same - using inline styles for brevity)
+    const fixedHeaderStyle = { position: 'fixed', top: 0, left: 0, width: '100%', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', padding: '15px 0', textAlign: 'center', zIndex: 10, fontSize: '20px', fontWeight: 'bold', color: '#333', };
     const headerWordStyle = { fontWeight: 'normal', fontSize: '1.2em', fontFamily: 'serif' };
-    const contentAreaStyle = { paddingTop: '80px', paddingBottom: '40px', width: '100%', maxWidth: '700px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', flex: 1, };
+    const contentAreaStyle = { paddingTop: '80px', paddingBottom: '40px', width: '100%', maxWidth: '700px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', textAlign: 'center', flex: 1, minHeight: 'calc(100vh - 80px)', boxSizing: 'border-box' }; // Adjusted minHeight and justifyContent
     const topNavContainerStyle = { display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '40px', width: '100%', };
     const mainHeadingStyle = { fontSize: '2.8em', fontWeight: 'bold', color: '#000000', textAlign: 'center', marginBottom: '10px', };
     const journalWordStyle = { fontWeight: 'normal', fontFamily: 'serif', marginLeft: '0.2em' };
@@ -213,19 +205,21 @@ function JournalEntry() {
                         value={userInput}
                         onChange={handleInputChange}
                         style={textAreaStyle}
-                        disabled={isProcessing}
+                        disabled={isProcessing} // Use isProcessing which is derived from isAnalyzing
                     />
 
                     {/* Bot Output Area */}
                     <div style={outputBoxStyle}>
-                        {response || "Your analyzed emotion will appear here..."}
+                        {/* Display the response state, or a default message */}
+                        {response || "Your analyzed emotion and depression level will appear here..."}
                     </div>
 
                     {/* Submit Button - Use StyledNavButton */}
                     <StyledNavButton
                         onClick={handleSubmit}
-                        disabled={isProcessing}
+                        disabled={isProcessing} // Use isProcessing
                     >
+                        {/* Show different text based on isAnalyzing state */}
                         {isAnalyzing ? 'Analyzing...' : 'Submit Entry'}
                     </StyledNavButton>
 
