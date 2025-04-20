@@ -24,14 +24,61 @@ const StyledNavButton = styled.button`
   &:hover { background-color: black; color: #FFF; }
 `;
 
-// --- Constants ---
+// --- Constants & Helper Logic (Ideally move to a shared utils file) ---
 const emotions = ['sadness', 'joy', 'love', 'anger', 'fear', 'surprise'];
 const emotionColors = {
   sadness: '#BCD8EC', joy: '#F9E1A8', love: '#FFCBE1',
   anger: '#FFDAB4', fear: '#DCCCEC', surprise: '#D6E5BD',
 };
+
+// Labels used in the legend/messages
+const depressionCategories = {
+    high: "Severe Depression",
+    mid: "Moderate Depression",
+    low: "Not Depressed",
+    na: "No Entry",
+};
+// Colors associated with each category key
+const depressionColors = {
+    high: '#FFDAB4', // Corresponds to 'Severe' in the report messages
+    mid: '#F9E1A8',  // Corresponds to 'Moderate' in the report messages
+    low: '#D6E5BD',  // Corresponds to 'Not Depressed' in the report messages
+    na: '#EAEAEA',
+};
+
+// --- Function to calculate derived daily depression level (from JournalHistory logic) ---
+const getDayDepressionSummary = (dayEntriesArray) => {
+    if (!dayEntriesArray || dayEntriesArray.length === 0) {
+        return 'na'; // No entries for the day
+    }
+    let sadnessCount = 0, angerCount = 0, fearCount = 0;
+    let joyCount = 0, loveCount = 0, surpriseCount = 0;
+
+    dayEntriesArray.forEach(entry => {
+        if (entry.emotion) {
+             switch (entry.emotion) {
+                case 'sadness': sadnessCount++; break;
+                case 'anger': angerCount++; break;
+                case 'fear': fearCount++; break;
+                case 'joy': joyCount++; break;
+                case 'love': loveCount++; break;
+                case 'surprise': surpriseCount++; break;
+                default: break;
+            }
+        }
+    });
+    const negativeCount = sadnessCount + angerCount + fearCount;
+    const positiveCount = joyCount + loveCount + surpriseCount;
+    if (negativeCount === 0 && positiveCount > 0) return 'low';
+    if (negativeCount >= 5) return 'high';
+    if (negativeCount > 0 && negativeCount < 5) return 'mid';
+    return 'na'; // Fallback
+};
+// --- End Constants & Helper Logic ---
+
+// --- Constants specifically for the Heatmap (using original depression data) ---
 const heatmapDepressionLabels = ["Severe Depression", "Moderate Depression", "Not Depressed"];
-// --- End Constants ---
+// --- End Heatmap Constants ---
 
 
 function JournalReport() {
@@ -66,62 +113,51 @@ function JournalReport() {
     }, [allStoredEntries]);
     // --- End Calculation ---
 
-    // --- NEW: Determine the MOST FREQUENT Depression Level Recorded (with tie-breaking) ---
+    // --- *** MODIFIED: Determine the MOST FREQUENT *DAILY DERIVED* Depression Level *** ---
     const dominantDepressionLevel = useMemo(() => {
-        let severeCount = 0;
-        let moderateCount = 0;
-        let notDepressedCount = 0;
+        // Counts for how many DAYS fall into each derived category
+        const dailyDerivedCounts = { high: 0, mid: 0, low: 0 };
 
-        // Count occurrences of each relevant depression level
+        // Iterate through each day's entries
         Object.values(allStoredEntries).forEach(dayEntriesArray => {
-            if (Array.isArray(dayEntriesArray)) {
-                dayEntriesArray.forEach(entry => {
-                    if (entry && entry.depression) {
-                        switch (entry.depression) {
-                            case "Severe Depression":
-                                severeCount++;
-                                break;
-                            case "Moderate Depression":
-                                moderateCount++;
-                                break;
-                            case "Not Depressed":
-                                notDepressedCount++;
-                                break;
-                            default:
-                                // Ignore "N/A" or other values
-                                break;
-                        }
-                    }
-                });
+            if (Array.isArray(dayEntriesArray) && dayEntriesArray.length > 0) {
+                // Calculate the derived level for this specific day
+                const derivedLevelKey = getDayDepressionSummary(dayEntriesArray); // Returns 'high', 'mid', 'low', or 'na'
+
+                // Increment the count for the corresponding category key if it's not 'na'
+                if (dailyDerivedCounts.hasOwnProperty(derivedLevelKey)) {
+                    dailyDerivedCounts[derivedLevelKey]++;
+                }
             }
         });
 
-        // Find the maximum count
-        const maxCount = Math.max(severeCount, moderateCount, notDepressedCount);
+        // Find the maximum count among the derived daily levels
+        const maxCount = Math.max(dailyDerivedCounts.high, dailyDerivedCounts.mid, dailyDerivedCounts.low);
 
-        // If no relevant entries were found, return null
+        // If no days had relevant entries to derive a level, return null
         if (maxCount === 0) {
-            // console.log("Dominant Depression Level (Frequency): None Found");
+             // console.log("Dominant Derived Daily Depression Level: None Found");
             return null;
         }
 
-        // Determine the dominant level based on frequency, prioritizing severity in ties
-        if (severeCount === maxCount) {
-            // console.log("Dominant Depression Level (Frequency): Severe");
-            return "Severe"; // Severe wins ties due to highest severity
-        } else if (moderateCount === maxCount) {
-            // console.log("Dominant Depression Level (Frequency): Moderate");
-            return "Moderate"; // Moderate wins ties over Not Depressed
-        } else { // Only remaining possibility is notDepressedCount === maxCount
-            // console.log("Dominant Depression Level (Frequency): Not Depressed");
-            return "Not Depressed";
+        // Determine the dominant level *label* based on frequency, prioritizing severity in ties
+        // Returns the *LABEL* (e.g., "Severe Depression") expected by the message components
+        if (dailyDerivedCounts.high === maxCount) {
+             // console.log("Dominant Derived Daily Depression Level: Severe");
+            return depressionCategories.high; // "Severe Depression"
+        } else if (dailyDerivedCounts.mid === maxCount) {
+             // console.log("Dominant Derived Daily Depression Level: Moderate");
+            return depressionCategories.mid; // "Moderate Depression"
+        } else { // Only remaining possibility is low === maxCount
+             // console.log("Dominant Derived Daily Depression Level: Not Depressed");
+            return depressionCategories.low; // "Not Depressed"
         }
 
     }, [allStoredEntries]); // Recalculate when fetched data changes
-    // --- End Depression Level Calculation ---
+    // --- End Modified Depression Level Calculation ---
 
 
-    // --- Process data for Heatmap (Unchanged Logic) ---
+    // --- Process data for Heatmap (Unchanged Logic - Uses ORIGINAL entry.depression) ---
     const heatmapSeries = useMemo(() => {
         const counts = {};
         heatmapDepressionLabels.forEach(depLabel => {
@@ -130,19 +166,17 @@ function JournalReport() {
                 counts[depLabel][emoLabel] = 0;
             });
         });
-
         Object.values(allStoredEntries).forEach(dayEntriesArray => {
             if (Array.isArray(dayEntriesArray)) {
                 dayEntriesArray.forEach(entry => {
                     const emotion = entry.emotion;
-                    const depression = entry.depression;
+                    const depression = entry.depression; // Using the original field here
                     if (emotion && emotions.includes(emotion) && depression && heatmapDepressionLabels.includes(depression)) {
                         counts[depression][emotion]++;
                     }
                 });
             }
         });
-
         const series = heatmapDepressionLabels.map(depLabel => {
             const dataPoints = emotions.map(emoLabel => ({
                 x: emoLabel.charAt(0).toUpperCase() + emoLabel.slice(1),
@@ -162,6 +196,7 @@ function JournalReport() {
                 shadeIntensity: 0.7, enableShades: true, radius: 4, useFillColorAsStroke: false,
                 colorScale: {
                     ranges: [
+                        { from: 0, to: 0, name: '0 entries', color: '#FFFFFF' }, // Explicitly handle 0
                         { from: 1, to: 5, name: '1-5 entries', color: '#C8E6C9' },
                         { from: 6, to: 10, name: '6-10 entries', color: '#81C784' },
                         { from: 11, to: 20, name: '11-20 entries', color: '#4CAF50' },
@@ -171,7 +206,7 @@ function JournalReport() {
                 }
             }
         },
-        dataLabels: { enabled: true, style: { fontSize: '12px', colors: ['#333'] } },
+        dataLabels: { enabled: true, style: { fontSize: '12px', colors: ['#333'] }, formatter: function(val) { return val > 0 ? val : ''; } }, // Hide label if 0
         xaxis: { type: 'category', title: { text: 'Emotion Category', style: { color: '#555', fontSize: '13px' } }, tickPlacement: 'on', labels: { style: { colors: '#555', fontSize: '12px' } } },
         yaxis: { title: { text: 'Actual Recorded Depression Level', style: { color: '#555', fontSize: '13px' } }, labels: { style: { colors: '#555', fontSize: '12px' } } },
         stroke: { width: 1, colors: ['#fff'] },
@@ -181,6 +216,7 @@ function JournalReport() {
                 formatter: function (value, { series, seriesIndex, dataPointIndex, w }) {
                     const emotion = w.globals.seriesX[seriesIndex]?.[dataPointIndex] || w.globals.labels[dataPointIndex];
                     const depressionLevel = series[seriesIndex]?.name;
+                    if (value === 0) return '0 entries'; // Show 0 if value is 0
                     if (!emotion || !depressionLevel) return `${value} entries`;
                     return `${value} entries (${emotion} / ${depressionLevel})`;
                 }
@@ -215,7 +251,7 @@ function JournalReport() {
         grid: { borderColor: '#f0f0f0', yaxis: { lines: { show: true } }, xaxis: { lines: { show: false } } }
     }), [barChartData.categories, barChartData.chartColors]);
 
-    // --- Styles (Unchanged from previous version) ---
+    // --- Styles (Unchanged) ---
     const fixedHeaderStyle = { position: 'fixed', top: 0, left: 0, width: '100%', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', padding: '15px 0', textAlign: 'center', zIndex: 10, fontSize: '20px', fontWeight: 'bold', color: '#333',} ;
     const headerWordStyle = { fontWeight: 'normal', fontSize: '1.2em', fontFamily: 'serif' };
     const contentAreaStyle = { paddingTop: '80px', paddingBottom: '40px', width: '100%', maxWidth: '900px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', textAlign: 'center', flex: 1, minHeight: 'calc(100vh - 80px)' };
@@ -235,6 +271,44 @@ function JournalReport() {
     const resourceListStyle = { listStyle: 'disc', paddingLeft: '25px', margin: '10px 0 0 0', };
     const resourceLinkStyle = { color: 'inherit', textDecoration: 'underline', };
     // --- End Styles ---
+
+    // --- Message Content (Date updated) ---
+    const severeMessage = (
+        <div style={severeMessageContainerStyle}>
+             <p style={messageTitleStyle}>Important Disclaimer & Support Resources:</p>
+             <p>This journal app analyzes text patterns and infers emotions; it cannot provide a medical diagnosis. The information presented here is not a substitute for professional medical advice, diagnosis, or treatment.</p>
+             <p>Based on your journal entries, reflections associated with significant distress appear most frequently across days. If you're consistently feeling down, overwhelmed, or finding it hard to cope, please know that support is available and reaching out is a sign of strength.</p>
+             <p>Mental Health Resources in Singapore (Checked as of April 21, 2025):</p>
+             <ul style={resourceListStyle}>
+                 <li>Samaritans of Singapore (SOS) 24/7 Hotline: <strong>1-767</strong></li>
+                 <li>Institute of Mental Health (IMH) Mental Health Helpline (24/7): <strong>6389 2222</strong></li>
+                 <li>Singapore Association for Mental Health (SAMH): <strong>1800 283 7019</strong> (Mon-Fri, 9am-6pm)</li>
+                 <li>CHAT (Youth mental health, ages 16-30): <a href="https://www.chat.mentalhealth.sg" target="_blank" rel="noopener noreferrer" style={resourceLinkStyle}>chat.mentalhealth.sg</a></li>
+             </ul>
+             <p>Please reach out if you need help. You are not alone.</p>
+        </div>
+    );
+
+    const moderateMessage = (
+         <div style={moderateMessageContainerStyle}>
+             <p style={messageTitleStyle}>Reflecting on Your Entries:</p>
+             <p>Your journal entries most often reflect days with challenging or moderately difficult emotions. Recognizing and acknowledging these patterns is an important part of understanding your emotional landscape.</p>
+             <p>Remember that emotional well-being is a journey with natural fluctuations. Consider exploring small, consistent activities that bring moments of calm or gentle joy.</p>
+             <p>If these feelings frequently feel overwhelming across days, talking to someone you trust or considering professional support can offer valuable perspective and coping strategies. (Resource numbers are available if needed).</p>
+             <p>Be patient and kind to yourself through this process.</p>
+         </div>
+    );
+
+     const happyMessage = (
+         <div style={happyMessageContainerStyle}>
+             <p style={messageTitleStyle}>A Positive Outlook!</p>
+             <p>It's great to see that your journal entries most frequently reflect days where positive emotions were dominant or significant negative emotions were less prevalent! Journaling is a fantastic tool for maintaining self-awareness.</p>
+             <p>Keep nurturing your emotional well-being through practices that support you, whether it's journaling, connecting with others, enjoying hobbies, or simply taking time for yourself.</p>
+             <p>Continue the excellent habit of checking in with yourself!</p>
+         </div>
+    );
+    // --- End Message Content ---
+
 
     return (
         <>
@@ -258,7 +332,7 @@ function JournalReport() {
                         Welcome to your <span style={journalWordStyle}>journal report</span>
                     </h1>
 
-                    {/* ApexCharts Heatmap */}
+                    {/* ApexCharts Heatmap (Shows correlation with ACTUAL recorded depression) */}
                     <h2 style={chartTitleStyle}>Emotion Counts by Actual Depression Level</h2>
                     <div style={heatmapContainerStyle}>
                         {heatmapSeries && heatmapSeries.length > 0 && heatmapSeries.some(s => s.data.some(dp => dp.y > 0)) ? (
@@ -273,7 +347,7 @@ function JournalReport() {
                         Heatmap showing total counts of each emotion grouped by the actual depression level recorded for the entry (excluding N/A).
                     </p>
 
-                    {/* ApexCharts Bar Chart */}
+                    {/* ApexCharts Bar Chart (Shows total emotion counts) */}
                     <h2 style={chartTitleStyle}>Total Emotion Breakdown</h2>
                     <div style={barChartContainerStyle}>
                         {barChartData.series.length > 0 && barChartData.series[0].data.some(d => d > 0) ? (
@@ -288,82 +362,26 @@ function JournalReport() {
                          Bar chart showing the total number of entries logged for each primary emotion.
                      </p>
 
-                    {/* --- Conditional Messages based on MOST FREQUENT Depression Level --- */}
+                    {/* --- Conditional Messages based on MOST FREQUENT *DAILY DERIVED* Depression Level --- */}
+                    <h2 style={chartTitleStyle}>Overall Tendency (Based on Daily Emotion Balance)</h2>
 
-                    {/* Severe Depression Message (Shown if Severe is most frequent, or tied for most frequent) */}
-                    {dominantDepressionLevel === 'Severe' && (
-                          <div style={severeMessageContainerStyle}>
-                              <p style={messageTitleStyle}>
-                                  Important Disclaimer & Support Resources:
-                              </p>
-                              <p>
-                                  This journal app analyzes text patterns and infers emotions; it cannot provide a medical diagnosis. The information presented here is not a substitute for professional medical advice, diagnosis, or treatment.
-                              </p>
-                              <p>
-                                  Based on your journal entries, reflections associated with significant distress appear most frequently. If you're consistently feeling down, overwhelmed, or finding it hard to cope, please know that support is available and reaching out is a sign of strength.
-                              </p>
-                              <p>
-                                  Mental Health Resources in Singapore:
-                                  <ul style={resourceListStyle}>
-                                      <li>
-                                          Samaritans of Singapore (SOS) 24/7 Hotline: <strong>1-767</strong> or <strong>1-SOS</strong>
-                                      </li>
-                                      <li>
-                                          Institute of Mental Health (IMH) Mental Health Helpline (24/7): <strong>6389 2222</strong>
-                                      </li>
-                                      <li>
-                                          Singapore Association for Mental Health (SAMH): <strong>1800 283 7019</strong>
-                                      </li>
-                                      <li>
-                                          CHAT (Youth mental health): <a href="https://www.chat.mentalhealth.sg" target="_blank" rel="noopener noreferrer" style={resourceLinkStyle}>chat.mentalhealth.sg</a>
-                                      </li>
-                                  </ul>
-                              </p>
-                               <p>
-                                  Please reach out if you need help. You are not alone.
-                               </p>
-                          </div>
+                    {/* Display the message corresponding to the dominant *derived* daily level */}
+                    {dominantDepressionLevel === depressionCategories.high && severeMessage}
+                    {dominantDepressionLevel === depressionCategories.mid && moderateMessage}
+                    {dominantDepressionLevel === depressionCategories.low && happyMessage}
+                    {!dominantDepressionLevel && Object.keys(allStoredEntries).length > 0 && (
+                         <div style={moderateMessageContainerStyle}> {/* Default message if no levels derived */}
+                            <p style={messageTitleStyle}>Report Summary:</p>
+                            <p>Could not determine a dominant daily trend based on recorded emotions. Ensure your entries include emotions like sadness, anger, fear, joy, love, or surprise.</p>
+                         </div>
                     )}
-
-                    {/* Moderate Depression Message (Shown if Moderate is most frequent and NOT tied with Severe) */}
-                    {dominantDepressionLevel === 'Moderate' && (
-                        <div style={moderateMessageContainerStyle}>
-                            <p style={messageTitleStyle}>
-                                Reflecting on Your Entries:
-                            </p>
-                            <p>
-                                Your journal entries most often reflect moments that seem challenging or moderately difficult. Recognizing and acknowledging these feelings is an important part of understanding your emotional landscape.
-                            </p>
-                            <p>
-                                Remember that emotional well-being is a journey with natural fluctuations. It's okay to have ups and downs. Consider exploring small, consistent activities that bring you moments of calm or gentle joy.
-                            </p>
-                            <p>
-                                If these feelings frequently feel overwhelming, talking to someone you trust or considering professional support can offer valuable perspective and coping strategies. (Resource numbers are available if needed).
-                            </p>
-                             <p>
-                                Be patient and kind to yourself through this process.
-                             </p>
-                        </div>
+                    {!dominantDepressionLevel && Object.keys(allStoredEntries).length === 0 && (
+                         <div style={moderateMessageContainerStyle}> {/* Message if no entries exist */}
+                             <p>Start journaling to see your overall tendency based on daily emotion balance!</p>
+                         </div>
                     )}
-
-                    {/* Not Depressed Message (Shown if Not Depressed is most frequent and NOT tied with Severe or Moderate) */}
-                    {dominantDepressionLevel === 'Not Depressed' && (
-                        <div style={happyMessageContainerStyle}>
-                            <p style={messageTitleStyle}>
-                                A Positive Outlook!
-                            </p>
-                            <p>
-                                It's great to see that your journal entries most frequently indicate you're feeling well! Journaling is a fantastic tool for maintaining self-awareness and appreciating the good moments.
-                            </p>
-                            <p>
-                                Keep nurturing your emotional well-being through practices that support you, whether it's journaling, connecting with others, enjoying hobbies, or simply taking time for yourself.
-                            </p>
-                             <p>
-                                Continue the excellent habit of checking in with yourself!
-                             </p>
-                        </div>
-                    )}
-
+                     <p style={subtitleStyle}>
+                     </p>
                     {/* End Conditional Messages */}
 
                 </div>

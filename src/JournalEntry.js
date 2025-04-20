@@ -67,23 +67,23 @@ function JournalEntry() {
         setResponse('Analyzing your thoughts...');
 
         try {
-            // *** IMPORTANT: Update this URL if your Render backend URL changed ***
-            const backendUrl = 'https://ai-f53i.onrender.com'; // Use the URL for the backend with BOTH models
+        //     // *** IMPORTANT: Update this URL if your Render backend URL changed ***
+        //     const backendUrl = 'https://ai-f53i.onrender.com'; // Use the URL for the backend with BOTH models
+        //     const endpoint = `${backendUrl}/analyze`;
+        //     const apiResponse = await fetch(endpoint, {
+        //         method: 'POST',
+        //         headers: { 'Content-Type': 'application/json', },
+        //         body: JSON.stringify({ text: userInput }),
+        //     });
+
+            // localhost version for testing
+            const backendUrl = 'http://localhost:5000'; // Use the URL for the backend with BOTH models
             const endpoint = `${backendUrl}/analyze`;
             const apiResponse = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', },
                 body: JSON.stringify({ text: userInput }),
             });
-
-            // // localhost version for testing
-            // const backendUrl = 'http://localhost:5000'; // Use the URL for the backend with BOTH models
-            // const endpoint = `${backendUrl}/analyze`;
-            // const apiResponse = await fetch(endpoint, {
-            //     method: 'POST',
-            //     headers: { 'Content-Type': 'application/json', },
-            //     body: JSON.stringify({ text: userInput }),
-            // });
 
             if (!apiResponse.ok) {
                 let errorDetails = `Server responded with status: ${apiResponse.status}`;

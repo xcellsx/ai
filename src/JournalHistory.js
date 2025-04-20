@@ -30,14 +30,14 @@ const emotionColors = {
 };
 const emotions = Object.keys(emotionColors).filter(k => k !== 'default'); // Get emotion names
 
-// Labels used in the legend
+// Labels used in the legend (These remain the same conceptually)
 const depressionCategories = {
     high: "Severe Depression",
     mid: "Moderate Depression",
-    low: "Not Depressed", // Changed label to match backend output
-    na: "No Entry",    // Label for 'NA' or missing entry
+    low: "Not Depressed",
+    na: "No Entry",     // Label for days with no applicable entries based on new rules
 };
-// Colors associated with each category key
+// Colors associated with each category key (These remain the same)
 const depressionColors = {
     high: '#FFDAB4', // Example: Orange/Reddish for high
     mid: '#F9E1A8',  // Example: Yellow for mid
@@ -54,16 +54,16 @@ const formatDateKey = (date) => {
     return `${year}-${month}-${day}`;
 };
 
-// UPDATED: Maps saved depression string labels to category keys ('high', 'mid', 'low', 'na')
-const getDepressionCategory = (value) => {
-    if (value === "Severe Depression") return 'high';
-    if (value === "Moderate Depression") return 'mid';
-    if (value === "Not Depressed") return 'low';
-    // Handle 'N/A', null, undefined, or other unexpected values as 'na'
-    return 'na';
-};
+// REMOVED/COMMENTED OUT: This function is no longer needed as depression category is derived from emotions.
+// const getDepressionCategory = (value) => {
+//     if (value === "Severe Depression") return 'high';
+//     if (value === "Moderate Depression") return 'mid';
+//     if (value === "Not Depressed") return 'low';
+//     // Handle 'N/A', null, undefined, or other unexpected values as 'na'
+//     return 'na';
+// };
 
-// Calculates emotion counts and finds highest count emotion (Unchanged)
+// Calculates emotion counts and finds highest count emotion (Unchanged - used for 'emotions' view and potentially modal)
 const getDaySummary = (dayEntriesArray) => {
     if (!dayEntriesArray || dayEntriesArray.length === 0) {
         const zeroCounts = {};
@@ -91,48 +91,60 @@ const getDaySummary = (dayEntriesArray) => {
     return { counts, highestEmotion, total: dayEntriesArray.length };
 };
 
-// NEW: Calculates depression counts and finds the category key with the highest count
+// *** MODIFIED: Calculates depression category ('high', 'mid', 'low', 'na') based on emotion counts ***
 const getDayDepressionSummary = (dayEntriesArray) => {
     if (!dayEntriesArray || dayEntriesArray.length === 0) {
-        return 'na'; // No entries, category is 'na'
+        return 'na'; // No entries for the day
     }
-    // Initialize counts for each category key
-    const counts = { high: 0, mid: 0, low: 0, na: 0 };
 
-    // Count occurrences of each depression category
+    // Count relevant emotions
+    let sadnessCount = 0;
+    let angerCount = 0;
+    let fearCount = 0;
+    let joyCount = 0;
+    let loveCount = 0;
+    let surpriseCount = 0;
+
     dayEntriesArray.forEach(entry => {
-        const category = getDepressionCategory(entry.depression); // Get category ('high', 'mid', 'low', 'na')
-        if (counts.hasOwnProperty(category)) {
-            counts[category]++;
+        // Only count entries that have a recognized emotion
+        if (entry.emotion) {
+             switch (entry.emotion) {
+                case 'sadness': sadnessCount++; break;
+                case 'anger': angerCount++; break;
+                case 'fear': fearCount++; break;
+                case 'joy': joyCount++; break;
+                case 'love': loveCount++; break;
+                case 'surprise': surpriseCount++; break;
+                default: break; // Ignore other potential emotion strings
+            }
         }
     });
 
-    let highestCategory = 'na'; // Default to 'na'
-    let maxCount = 0;
+    const negativeCount = sadnessCount + angerCount + fearCount;
+    const positiveCount = joyCount + loveCount + surpriseCount;
 
-    // Define the order of checking if you want to prioritize (e.g., show 'high' if tied)
-    const categoriesToCheck = ['high', 'mid', 'low'];
+    // --- Apply New Rules ---
 
-    // Find the category ('high', 'mid', 'low') with the highest count
-    categoriesToCheck.forEach(category => {
-        if (counts[category] > maxCount) {
-            maxCount = counts[category];
-            highestCategory = category;
-        }
-        // Example of prioritizing 'high' in case of a tie with 'mid' or 'low'
-        // else if (counts[category] === maxCount && category === 'high') {
-        //     highestCategory = 'high';
-        // }
-        // Add more tie-breaking logic if needed
-    });
-
-    // If maxCount is still 0 after checking high, mid, low, it means only 'na' entries existed
-    // or no valid entries were found, so return 'na'.
-    if (maxCount === 0) {
-         return 'na';
+    // Rule 1: If only positive emotions (joy, love, surprise) are present -> Not Depressed
+    // (Handles cases where negativeCount is 0, but positiveCount > 0)
+    if (negativeCount === 0 && positiveCount > 0) {
+         return 'low'; // Not Depressed
     }
 
-    return highestCategory; // Return the category key ('high', 'mid', 'low') with the highest count
+    // Rule 3: If sum of sadness, anger, fear is 5 or more -> Severe Depression
+    // (This rule takes precedence if negative emotions exist, even if positive ones also exist)
+    if (negativeCount >= 5) {
+        return 'high'; // Severe Depression
+    }
+
+    // Rule 2: If sum of sadness, anger, fear is 1 to 4 -> Moderate Depression
+    if (negativeCount > 0 && negativeCount < 5) {
+        return 'mid'; // Moderate Depression
+    }
+
+    // Fallback: No relevant positive or negative emotions recorded (negativeCount is 0, positiveCount is 0),
+    // or other edge cases.
+    return 'na'; // No Entry / Not Applicable
 };
 // --- End Helper Functions ---
 
@@ -154,11 +166,14 @@ function JournalHistory() {
     // --- Fetch Data (Unchanged) ---
     useEffect(() => {
         try {
-            const entries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
+            // Ensure data is parsed correctly, handle potential errors
+            const storedData = localStorage.getItem('journalEntries');
+            const entries = storedData ? JSON.parse(storedData) : {};
+             // Basic validation might be good here depending on data source
             setAllStoredEntries(entries);
         } catch (error) {
-            console.error("Failed to load entries from Local Storage:", error);
-            setAllStoredEntries({});
+            console.error("Failed to load or parse entries from Local Storage:", error);
+            setAllStoredEntries({}); // Set to empty if error
         }
     }, []);
 
@@ -263,7 +278,7 @@ function JournalHistory() {
                                     let bgColor = emotionColors.default; // Default background
                                     let textColor = '#333'; // Default text color
 
-                                    // --- UPDATED LOGIC ---
+                                    // --- LOGIC FOR CELL COLOR BASED ON VIEWMODE ---
                                     if (viewMode === 'emotions') {
                                         // Use existing summary function for emotions
                                         const { highestEmotion } = getDaySummary(dayEntriesArray);
@@ -271,13 +286,13 @@ function JournalHistory() {
                                         // Optional: Adjust text color based on emotion background
                                         // textColor = ...
                                     } else { // viewMode === 'depression'
-                                        // Use NEW summary function for depression
-                                        const highestDepressionCategory = getDayDepressionSummary(dayEntriesArray);
-                                        // Get color based on the category key ('high', 'mid', 'low', 'na')
-                                        bgColor = depressionColors[highestDepressionCategory];
+                                        // Use **MODIFIED** summary function for depression (derives level from emotions)
+                                        const derivedDepressionCategory = getDayDepressionSummary(dayEntriesArray);
+                                        // Get color based on the derived category key ('high', 'mid', 'low', 'na')
+                                        bgColor = depressionColors[derivedDepressionCategory];
                                         textColor = '#333'; // Keep text dark for depression colors
                                     }
-                                    // --- END UPDATED LOGIC ---
+                                    // --- END LOGIC FOR CELL COLOR ---
 
                                     cellStyle = { ...dayCellStyleBase, backgroundColor: bgColor, color: textColor };
                                     cellContent = dayNumber;
@@ -286,13 +301,13 @@ function JournalHistory() {
                                     cellStyle = emptyDayCellStyle;
                                 }
 
-                                // Click Handler to Open Modal (Unchanged)
+                                // Click Handler to Open Modal (Unchanged - Modal still shows raw entry data)
                                 const handleDayClick = () => {
                                      if (isCurrentMonthDay && dayEntriesArray.length > 0) {
-                                         const dateKey = formatDateKey(new Date(currentYear, currentMonth, dayNumber));
-                                         const summary = getDaySummary(dayEntriesArray); // Emotion summary for modal
-                                         // You could potentially add depression summary to modalData too if needed
-                                         setModalData({ date: dateKey, entries: dayEntriesArray, counts: summary.counts });
+                                          const dateKey = formatDateKey(new Date(currentYear, currentMonth, dayNumber));
+                                          const summary = getDaySummary(dayEntriesArray); // Emotion summary for modal
+                                          // Modal will show raw entry data, including original 'entry.depression' if present.
+                                          setModalData({ date: dateKey, entries: dayEntriesArray, counts: summary.counts });
                                      }
                                 };
 
@@ -305,45 +320,45 @@ function JournalHistory() {
                         </div>
                     </div>
 
-                    {/* Conditional Legends (Unchanged) */}
-                     {viewMode === 'emotions' && (
-                          <div style={legendContainerStyle}>
-                              <p style={legendTitleStyle}>Emotion Legend</p>
-                              <div style={legendItemsContainerStyle}>
-                                  {emotions.map(emotion => (
-                                      <div key={emotion} style={legendItemStyle}>
-                                          <span style={{...legendColorDotStyle, backgroundColor: emotionColors[emotion] }}></span>
-                                          {emotion.charAt(0).toUpperCase() + emotion.slice(1)}
-                                      </div>
-                                  ))}
-                                   <div key="default" style={legendItemStyle}>
-                                       <span style={{ ...legendColorDotStyle, backgroundColor: emotionColors.default }}></span>
-                                       No Entry
-                                   </div>
-                              </div>
-                          </div>
-                     )}
+                    {/* Conditional Legends (Unchanged - Legends themselves are still valid) */}
+                       {viewMode === 'emotions' && (
+                           <div style={legendContainerStyle}>
+                               <p style={legendTitleStyle}>Emotion Legend</p>
+                               <div style={legendItemsContainerStyle}>
+                                   {emotions.map(emotion => (
+                                       <div key={emotion} style={legendItemStyle}>
+                                           <span style={{...legendColorDotStyle, backgroundColor: emotionColors[emotion] }}></span>
+                                           {emotion.charAt(0).toUpperCase() + emotion.slice(1)}
+                                       </div>
+                                   ))}
+                                    <div key="default" style={legendItemStyle}>
+                                        <span style={{ ...legendColorDotStyle, backgroundColor: emotionColors.default }}></span>
+                                        No Entry
+                                    </div>
+                               </div>
+                           </div>
+                       )}
 
-                     {viewMode === 'depression' && (
-                          <div style={legendContainerStyle}>
-                              <p style={legendTitleStyle}>Depression Level</p>
-                              <div style={legendItemsContainerStyle}>
-                                  {/* Use depressionCategories for legend text */}
-                                  {Object.entries(depressionCategories).map(([key, name]) => (
-                                      <div key={key} style={legendItemStyle}>
-                                          <span style={{...legendColorDotStyle, backgroundColor: depressionColors[key] }}></span>
-                                          {name} {/* Display user-friendly name */}
-                                      </div>
-                                  ))}
-                              </div>
-                          </div>
-                     )}
+                       {viewMode === 'depression' && (
+                           <div style={legendContainerStyle}>
+                               <p style={legendTitleStyle}>Derived Depression Level</p> {/* Updated title slightly */}
+                               <div style={legendItemsContainerStyle}>
+                                   {/* Use depressionCategories for legend text */}
+                                   {Object.entries(depressionCategories).map(([key, name]) => (
+                                       <div key={key} style={legendItemStyle}>
+                                           <span style={{...legendColorDotStyle, backgroundColor: depressionColors[key] }}></span>
+                                           {name} {/* Display user-friendly name */}
+                                       </div>
+                                   ))}
+                               </div>
+                           </div>
+                       )}
                     {/* End Conditional Legend */}
 
                 </div>
             </AnimatedBackgroundContainer>
 
-            {/* Modal Rendering (Unchanged - already displays depression level per entry) */}
+            {/* Modal Rendering (Unchanged - Still shows raw entry data including original depression field if exists) */}
             {modalData && (
                  <div style={modalOverlayStyle} onClick={() => setModalData(null)}>
                       <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
@@ -360,24 +375,29 @@ function JournalHistory() {
                                       </span>
                                   )
                               ))}
-                               {Object.values(modalData.counts).every(c => c === 0) && <span>No emotions recorded.</span>}
+                                {Object.values(modalData.counts).every(c => c === 0) && <span>No emotions recorded.</span>}
                           </div>
                           {/* Display Individual Entries */}
                           <h4>Entries:</h4>
                           {modalData.entries
-                              .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)) // Sort by time
+                              .sort((a, b) => { // Robust sorting
+                                  const dateA = a.timestamp ? new Date(a.timestamp) : 0;
+                                  const dateB = b.timestamp ? new Date(b.timestamp) : 0;
+                                  return dateA - dateB;
+                              })
                               .map((entry, idx) => (
-                               <div key={idx} style={{...modalEntryStyle, borderBottom: idx === modalData.entries.length - 1 ? 'none' : '1px solid #eee', marginBottom: idx === modalData.entries.length - 1 ? 0 : '12px'}}> {/* Handle last item border */}
-                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px'}}>
-                                        <span>
-                                            <strong style={{color: emotionColors[entry.emotion] || '#333'}}>Emotion:</strong> {entry.emotion || 'N/A'} |
-                                            <strong> Depression:</strong> {entry.depression || 'N/A'} {/* Already shows depression */}
-                                        </span>
-                                        <small style={{color: '#888'}}> {entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</small>
-                                    </div>
-                                    <div style={{color: '#555', fontSize: '0.9em', marginBottom: '5px'}}>Bot: {entry.botResponse || 'N/A'}</div>
-                                    {entry.text && <div style={modalEntryTextStyle}>"{entry.text}"</div>}
-                               </div>
+                                 <div key={idx} style={{...modalEntryStyle, borderBottom: idx === modalData.entries.length - 1 ? 'none' : '1px solid #eee', marginBottom: idx === modalData.entries.length - 1 ? 0 : '12px'}}> {/* Handle last item border */}
+                                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px'}}>
+                                          <span>
+                                              <strong style={{color: emotionColors[entry.emotion] || '#333'}}>Emotion:</strong> {entry.emotion || 'N/A'} |
+                                              {/* This still shows the original depression field from the data */}
+                                              <strong> Depression:</strong> {entry.depression || 'N/A'}
+                                          </span>
+                                          <small style={{color: '#888'}}> {entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</small>
+                                      </div>
+                                      <div style={{color: '#555', fontSize: '0.9em', marginBottom: '5px'}}>Bot: {entry.botResponse || 'N/A'}</div>
+                                      {entry.text && <div style={modalEntryTextStyle}>"{entry.text}"</div>}
+                                 </div>
                           ))}
                       </div>
                  </div>
