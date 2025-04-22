@@ -14,7 +14,7 @@ import numpy as np
 # --- Configuration ---
 # Path for the EMOTION model (Hugging Face format directory)
 # This directory should contain config.json, pytorch_model.bin, tokenizer_config.json etc.
-EMOTION_MODEL_PATH = "./results/bert_uncased_L-2_H-128_A-2-finetuned-emotion/best_model" # Adjust if your path differs
+EMOTION_MODEL_PATH = "./results/best_model" # Adjust if your path differs
 
 # Path for the DEPRESSION model weights (.pt file containing the state_dict)
 DEPRESSION_MODEL_WEIGHTS = 'roberta_cnn_nf128_ks3_do40_lr1e-05_.pt' # Ensure this file is accessible

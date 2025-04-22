@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import AnimatedBackgroundContainer from './AnimatedBackgroundContainer';
+import { DateTime } from 'luxon'; // <-- Import DateTime from Luxon
 
-// Assuming StyledNavButton is defined here or imported from './StyledComponents'
+// StyledNavButton definition (assuming it's defined as provided previously)
 const StyledNavButton = styled.button`
   background-color: transparent;
   color: #333;
@@ -13,7 +14,7 @@ const StyledNavButton = styled.button`
   margin: 0 5px;      // Margin for nav buttons primarily
   border-radius: 5px;
   cursor: pointer;
-  font-size: 1em;    // Font size for submit button
+  font-size: 1em;      // Font size for submit button
   text-decoration: none;
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
@@ -67,17 +68,11 @@ function JournalEntry() {
         setResponse('Analyzing your thoughts...');
 
         try {
-        //     // *** IMPORTANT: Update this URL if your Render backend URL changed ***
-        //     const backendUrl = 'https://ai-f53i.onrender.com'; // Use the URL for the backend with BOTH models
-        //     const endpoint = `${backendUrl}/analyze`;
-        //     const apiResponse = await fetch(endpoint, {
-        //         method: 'POST',
-        //         headers: { 'Content-Type': 'application/json', },
-        //         body: JSON.stringify({ text: userInput }),
-        //     });
+            // --- CHOOSE YOUR BACKEND URL ---
+            // const backendUrl = 'https://your-render-backend-url.onrender.com'; // RENDER/PRODUCTION URL
+            const backendUrl = 'http://localhost:5000'; // LOCAL DEVELOPMENT URL
+            // --- ---
 
-            // localhost version for testing
-            const backendUrl = 'http://localhost:5000'; // Use the URL for the backend with BOTH models
             const endpoint = `${backendUrl}/analyze`;
             const apiResponse = await fetch(endpoint, {
                 method: 'POST',
@@ -89,45 +84,44 @@ function JournalEntry() {
                 let errorDetails = `Server responded with status: ${apiResponse.status}`;
                 try {
                     const errorData = await apiResponse.json();
-                    // Use the specific error message from backend if available
                     errorDetails += `. ${errorData.error || JSON.stringify(errorData)}`;
                 } catch (e) {
                     errorDetails += ". Could not parse error response body.";
                 }
                 console.error("Backend error:", errorDetails);
-                // Display the error message to the user
                 throw new Error(errorDetails);
             }
 
-            // Expecting response like: {'emotion': '...', 'depression': '...'}
             const result = await apiResponse.json();
             console.log("Analysis result from backend:", result);
 
-            // Extract results, providing defaults if keys are missing or null
             const detectedEmotion = result.emotion || 'N/A';
-            const detectedDepression = result.depression || 'N/A'; // Get the depression result
-
-            // Format the response string to show both results
+            const detectedDepression = result.depression || 'N/A';
             const formattedResponse = `Emotion: ${detectedEmotion} | Depression: ${detectedDepression}. Thank you for sharing.`;
-            setResponse(formattedResponse); // Update the UI
+            setResponse(formattedResponse);
 
             // --- SAVE TO LOCAL STORAGE (Handles Multiple Entries) ---
             try {
-                const todayDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+                // Use YYYY-MM-DD based on UTC date for consistent grouping key
+                const todayDate = new Date().toISOString().split('T')[0];
                 const allEntries = JSON.parse(localStorage.getItem('journalEntries') || '{}');
-                const dayEntries = allEntries[todayDate] || []; // Get existing array or init empty
+                const dayEntries = allEntries[todayDate] || [];
+
+                // --- Get current time in Singapore Time Zone using Luxon ---
+                const nowInSGT = DateTime.now().setZone('Asia/Singapore');
+                // Format as ISO string WITH offset (e.g., 2023-10-27T18:30:00.123+08:00)
+                const timestampSGT = nowInSGT.toISO();
+                // --- ---
 
                 const newEntryData = {
-                    // Store the actual detected values
                     emotion: detectedEmotion,
-                    depression: detectedDepression, // Store the actual depression result
+                    depression: detectedDepression,
                     text: userInput,
-                    // Store the formatted string that was shown to the user
                     botResponse: formattedResponse,
-                    timestamp: new Date().toISOString() // Add timestamp for ordering
+                    timestamp: timestampSGT, // <-- Use the SGT formatted timestamp
                 };
 
-                dayEntries.push(newEntryData); // Append the new entry
+                dayEntries.push(newEntryData);
                 allEntries[todayDate] = dayEntries; // Update the main entries object
 
                 localStorage.setItem('journalEntries', JSON.stringify(allEntries));
@@ -135,7 +129,6 @@ function JournalEntry() {
 
             } catch (storageError) {
                 console.error("Failed to save entry to Local Storage:", storageError);
-                // Inform user saving failed, but keep the analysis result visible
                 setResponse(prev => `${prev} (Error saving entry)`);
             }
             // --- END SAVE TO LOCAL STORAGE ---
@@ -145,7 +138,6 @@ function JournalEntry() {
 
         } catch (error) {
              console.error("Error during submission or analysis:", error);
-             // Display the specific error message from the backend or fetch process
              setResponse(`An error occurred: ${error.message}. Please try again.`);
              // Keep user input in the textarea in case of error for retry
         } finally {
@@ -156,10 +148,9 @@ function JournalEntry() {
     // --- End Core Logic ---
 
     // --- Styles ---
-    // (Styles remain the same - using inline styles for brevity)
     const fixedHeaderStyle = { position: 'fixed', top: 0, left: 0, width: '100%', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', padding: '15px 0', textAlign: 'center', zIndex: 10, fontSize: '20px', fontWeight: 'bold', color: '#333', };
     const headerWordStyle = { fontWeight: 'normal', fontSize: '1.2em', fontFamily: 'serif' };
-    const contentAreaStyle = { paddingTop: '80px', paddingBottom: '40px', width: '100%', maxWidth: '700px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', textAlign: 'center', flex: 1, minHeight: 'calc(100vh - 80px)', boxSizing: 'border-box' }; // Adjusted minHeight and justifyContent
+    const contentAreaStyle = { paddingTop: '80px', paddingBottom: '40px', width: '100%', maxWidth: '700px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', textAlign: 'center', flex: 1, minHeight: 'calc(100vh - 80px)', boxSizing: 'border-box' };
     const topNavContainerStyle = { display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '40px', width: '100%', };
     const mainHeadingStyle = { fontSize: '2.8em', fontWeight: 'bold', color: '#000000', textAlign: 'center', marginBottom: '10px', };
     const journalWordStyle = { fontWeight: 'normal', fontFamily: 'serif', marginLeft: '0.2em' };
@@ -168,7 +159,7 @@ function JournalEntry() {
     const outputBoxStyle = { width: '100%', minHeight: '60px', padding: '15px', marginBottom: '30px', border: '1px dashed #CCC', borderRadius: '5px', backgroundColor: 'rgba(234, 234, 234, 0.6)', fontSize: '1em', color: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', boxSizing: 'border-box', fontFamily: 'inherit', lineHeight: '1.5', };
     // --- End Styles ---
 
-    const isProcessing = isAnalyzing;
+    const isProcessing = isAnalyzing; // Maintain alias if used elsewhere, otherwise directly use isAnalyzing
 
     return (
         <>
@@ -183,7 +174,6 @@ function JournalEntry() {
 
                     {/* Top Navigation Buttons */}
                     <div style={topNavContainerStyle}>
-                        {/* Use className="nav-button-style" if you add specific styles for nav vs submit */}
                         <Link to="/" style={{ textDecoration: 'none' }}><StyledNavButton className="nav-button-style">Home</StyledNavButton></Link>
                         <Link to="/journal-history" style={{ textDecoration: 'none' }}><StyledNavButton className="nav-button-style">View History</StyledNavButton></Link>
                         <Link to="/journal-report" style={{ textDecoration: 'none' }}><StyledNavButton className="nav-button-style">View Report</StyledNavButton></Link>
@@ -205,21 +195,19 @@ function JournalEntry() {
                         value={userInput}
                         onChange={handleInputChange}
                         style={textAreaStyle}
-                        disabled={isProcessing} // Use isProcessing which is derived from isAnalyzing
+                        disabled={isProcessing} // Disable textarea while processing
                     />
 
                     {/* Bot Output Area */}
                     <div style={outputBoxStyle}>
-                        {/* Display the response state, or a default message */}
                         {response || "Your analyzed emotion and depression level will appear here..."}
                     </div>
 
                     {/* Submit Button - Use StyledNavButton */}
                     <StyledNavButton
                         onClick={handleSubmit}
-                        disabled={isProcessing} // Use isProcessing
+                        disabled={isProcessing} // Disable button while processing
                     >
-                        {/* Show different text based on isAnalyzing state */}
                         {isAnalyzing ? 'Analyzing...' : 'Submit Entry'}
                     </StyledNavButton>
 
